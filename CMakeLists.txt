@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.11) # FetchContent is available in 3.11+
+cmake_minimum_required(VERSION 3.11)
 project(main LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -7,33 +7,49 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Generate compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Include external libraries
 include_directories(external/raygui)
+
+# Set build directory
+set(CMAKE_BINARY_DIR ${CMAKE_SOURCE_DIR}/out)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
 # Dependencies
 set(RAYLIB_VERSION 5.5)
-find_package(raylib ${RAYLIB_VERSION} QUIET) # QUIET or REQUIRED
-if (NOT raylib_FOUND) # If there's none, fetch and build raylib
-  include(FetchContent)
-  FetchContent_Declare(
+include(FetchContent)
+FetchContent_Declare(
     raylib
     DOWNLOAD_EXTRACT_TIMESTAMP OFF
     URL https://github.com/raysan5/raylib/archive/refs/tags/${RAYLIB_VERSION}.tar.gz
-  )
-  FetchContent_GetProperties(raylib)
-  if (NOT raylib_POPULATED) # Have we downloaded raylib yet?
+)
+
+FetchContent_GetProperties(raylib)
+if (NOT raylib_POPULATED)
     set(FETCHCONTENT_QUIET NO)
     FetchContent_MakeAvailable(raylib)
-    set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE) # don't build the supplied examples
-  endif()
+    set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE) # Don't build the supplied examples
 endif()
 
-# Our Project
+# Ensure VS Code detects Raylib headers
+include_directories(${raylib_SOURCE_DIR}/src)
 
-add_executable(${PROJECT_NAME} main.cpp)
-#set(raylib_VERBOSE 1)
+# Collect all source files
+file(GLOB_RECURSE SRC_FILES src/*.cpp src/*.h)
+
+# Create the executable
+add_executable(${PROJECT_NAME} ${SRC_FILES})
+
+# Link Raylib
 target_link_libraries(${PROJECT_NAME} raylib)
 
-# Checks if OSX and links appropriate frameworks (Only required on MacOS)
+# Ensure the assets folder is copied into the build directory
+add_custom_target(copy_assets ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/assets ${CMAKE_BINARY_DIR}/assets
+)
+add_dependencies(${PROJECT_NAME} copy_assets)
+
+# MacOS specific settings
 if (APPLE)
     target_link_libraries(${PROJECT_NAME} "-framework IOKit")
     target_link_libraries(${PROJECT_NAME} "-framework Cocoa")
